@@ -6,7 +6,7 @@ riakycsb
 https://www.dropbox.com/sh/x51gvnrsegqwiqo/SXXErjpdyQ
 3. To run ycsb with riak client:
 
-java -cp path/to/ycsb/core/core-0.1.4.jar:/path/to/lib/jars/*:/path/to/riakycsb/jar/riakycsb.jar com.yahoo.ycsb.Client -load -db com.son.riakycsb.RiakClient -P workloads/workloada -s -p hosts="127.0.0.1:10018,127.0.0.1:10028,127.0.0.1:10038"
+java -cp path/to/ycsb/core/core-0.1.4.jar:/path/to/riakycsb/lib/*:/path/to/riakycsb/riakycsb.jar com.yahoo.ycsb.Client -load -db com.son.riakycsb.RiakClient -P workloads/workloada -s -p hosts="127.0.0.1:10018,127.0.0.1:10028,127.0.0.1:10038"
 
 the command above will execute the -load phase. To execute the transaction phase, use -t instead
 
