@@ -5,9 +5,12 @@ import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.client.ClientProtocolException;
@@ -41,12 +44,12 @@ public class RiakClient extends DB
             new HashSet<Integer>(Arrays.asList(204, 404));
     
     public static int UNDEFINED_ERROR_CODE = -1;
-    public static String DATA_FIELD = "data";
     
     CloseableHttpClient httpClient = HttpClients.createDefault();
     Random random = new Random();
     
     String myhost;
+    int readDelay;
   public void init() throws DBException
   {
     String hosts = getProperties().getProperty("hosts");
@@ -58,6 +61,9 @@ public class RiakClient extends DB
     
     String[] allhosts = hosts.split(",");
     myhost = allhosts[random.nextInt(allhosts.length)];
+    
+    String delay = getProperties().getProperty("readDelay");
+    readDelay = delay == null? 0 : Integer.parseInt(delay);
   }
   
   //Read a single record
@@ -67,7 +73,7 @@ public class RiakClient extends DB
     int statusCode = 0;
     String content;
      
-    String url = makeURL(table, key);
+    String url = makeURLRead(table, key);
     HttpGet httpGet = new HttpGet(url);
  
     try
@@ -95,9 +101,17 @@ public class RiakClient extends DB
         return statusCode;
     }
     
-    ByteIterator value = new StringByteIterator(content);
-    result.put(DATA_FIELD, value);
-
+    Pattern pattern = Pattern.compile("(field\\d)=====(.*?)#####");
+    Matcher matcher = pattern.matcher(content);
+    
+    while (matcher.find()) {
+    	int count = matcher.groupCount();
+      for (int i = 1; i <= count; i++)
+      {
+      	result.put(matcher.group(1), new StringByteIterator(matcher.group(2)));
+      }
+    }
+    
     return 0;
   }
 
@@ -120,10 +134,17 @@ public class RiakClient extends DB
   public int insert(String table, String key, 
       HashMap<String,ByteIterator> values)
   {
-    String url = makeURL(table, key);
+    String url = makeURLWrite(table, key);
     HttpPost httpPost = new HttpPost(url);
     
-    String content = values.toString();
+    StringBuilder builder = new StringBuilder();
+    for (Map.Entry<String, ByteIterator> entry : values.entrySet()) {
+      String field = entry.getKey();
+      String value = entry.getValue().toString();
+      builder.append(field+"====="+value+"#####");
+    }
+    
+    String content = builder.toString();
     HttpEntity entity;
     int statusCode = 0;
     
@@ -163,7 +184,7 @@ public class RiakClient extends DB
   //Delete a single record
   public int delete(String table, String key)
   {
-    String url = makeURL(table, key);
+    String url = makeURLWrite(table, key);
     HttpDelete httpDelete = new HttpDelete(url);
     
     int statusCode = 0;
@@ -198,9 +219,14 @@ public class RiakClient extends DB
     return 0;
   }
   
-  private String makeURL(String table, String key)
+  private String makeURLRead(String table, String key)
   {
-    return String.format("http://%s/buckets/%s/keys/%s", myhost, table, key);
+    return String.format("http://%s/buckets/%s/keys/%s?r=1&read_delay=%d", myhost, table, key, readDelay);
+  }
+  
+  private String makeURLWrite(String table, String key)
+  {
+    return String.format("http://%s/buckets/%s/keys/%s?returnbody=false", myhost, table, key);
   }
   
 }
