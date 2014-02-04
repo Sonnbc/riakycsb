@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.client.ClientProtocolException;
@@ -48,7 +46,7 @@ public class RiakClient extends DB
     CloseableHttpClient httpClient = HttpClients.createDefault();
     Random random = new Random();
     
-    String myhost;
+    String[] myhosts;
     int readDelay;
   public void init() throws DBException
   {
@@ -59,8 +57,7 @@ public class RiakClient extends DB
               "Required property \"hosts\" missing for RiakClient");
     }
     
-    String[] allhosts = hosts.split(",");
-    myhost = allhosts[random.nextInt(allhosts.length)];
+    myhosts = hosts.split(",");
     
     String delay = getProperties().getProperty("readDelay");
     readDelay = delay == null? 0 : Integer.parseInt(delay);
@@ -101,16 +98,17 @@ public class RiakClient extends DB
         return statusCode;
     }
     
-    Pattern pattern = Pattern.compile("(field\\d)=====(.*?)#####");
+    /*Pattern pattern = Pattern.compile("(field\\d)=====(.*?)#####");
     Matcher matcher = pattern.matcher(content);
-    
     while (matcher.find()) {
     	int count = matcher.groupCount();
       for (int i = 1; i <= count; i++)
       {
       	result.put(matcher.group(1), new StringByteIterator(matcher.group(2)));
       }
-    }
+    }*/
+    
+    result.put("Data", new StringByteIterator(content));
     
     return 0;
   }
@@ -134,14 +132,15 @@ public class RiakClient extends DB
   public int insert(String table, String key, 
       HashMap<String,ByteIterator> values)
   {
+  	//TODO: change format to JSON
     String url = makeURLWrite(table, key);
     HttpPost httpPost = new HttpPost(url);
     
     StringBuilder builder = new StringBuilder();
     for (Map.Entry<String, ByteIterator> entry : values.entrySet()) {
-      String field = entry.getKey();
+      //String field = entry.getKey();
       String value = entry.getValue().toString();
-      builder.append(field+"====="+value+"#####");
+      builder.append(value);
     }
     
     String content = builder.toString();
@@ -219,14 +218,18 @@ public class RiakClient extends DB
     return 0;
   }
   
+  private String randomHost()
+  {
+  	return myhosts[random.nextInt(myhosts.length)];
+  }
   private String makeURLRead(String table, String key)
   {
-    return String.format("http://%s/buckets/%s/keys/%s?r=1&read_delay=%d", myhost, table, key, readDelay);
+    return String.format("http://%s/buckets/%s/keys/%s?r=1&read_delay=%d", randomHost(), table, key, readDelay);
   }
   
   private String makeURLWrite(String table, String key)
   {
-    return String.format("http://%s/buckets/%s/keys/%s?returnbody=false", myhost, table, key);
+    return String.format("http://%s/buckets/%s/keys/%s?returnbody=false", randomHost(), table, key);
   }
   
 }
